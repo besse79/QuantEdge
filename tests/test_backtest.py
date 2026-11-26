@@ -57,5 +57,11 @@ class PointInTimeBacktestTests(unittest.TestCase):
             backtest(self.bars, {datetime(2026, 11, 16, 12): True})
 
 
+class PriceTypeTests(unittest.TestCase):
+    def test_boolean_price_rejected(self):
+        with self.assertRaisesRegex(ValueError, "OHLC"):
+            backtest([Bar(d(16), True, 10)], {})
+
+
 if __name__ == "__main__":
     unittest.main()
