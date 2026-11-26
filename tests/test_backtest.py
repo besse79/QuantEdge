@@ -51,6 +51,11 @@ class PointInTimeBacktestTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "calendar dates"):
             backtest([Bar(datetime(2026, 11, 16, 12), 10, 11)], {})
 
+    def test_intraday_signal_rejected(self):
+        from datetime import datetime
+        with self.assertRaisesRegex(ValueError, "signals must map dates"):
+            backtest(self.bars, {datetime(2026, 11, 16, 12): True})
+
 
 if __name__ == "__main__":
     unittest.main()
