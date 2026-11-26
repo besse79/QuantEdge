@@ -64,7 +64,7 @@ def backtest(
     if days != sorted(set(days)):
         raise ValueError("bars must have strictly increasing unique dates")
     for bar in bars:
-        if any(not isfinite(p) or p <= 0 for p in (bar.open, bar.close)):
+        if any(isinstance(p, bool) or not isfinite(p) or p <= 0 for p in (bar.open, bar.close)):
             raise ValueError("OHLC prices must be finite and positive")
     if any(type(day) is not date or not isinstance(value, bool) for day, value in signals.items()):
         raise ValueError("signals must map dates to booleans")
