@@ -66,7 +66,7 @@ def backtest(
     for bar in bars:
         if any(not isfinite(p) or p <= 0 for p in (bar.open, bar.close)):
             raise ValueError("OHLC prices must be finite and positive")
-    if any(not isinstance(day, date) or not isinstance(value, bool) for day, value in signals.items()):
+    if any(type(day) is not date or not isinstance(value, bool) for day, value in signals.items()):
         raise ValueError("signals must map dates to booleans")
     cash, quantity = float(initial_cash), 0
     trades: list[Trade] = []
