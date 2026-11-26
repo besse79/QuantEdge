@@ -29,6 +29,11 @@ class PointInTimeBacktestTests(unittest.TestCase):
         self.assertEqual(result.trades[0].quantity, 4)
         self.assertEqual(result.snapshots[1].cash, 19)
 
+    def test_exit_fee_cannot_create_negative_cash(self):
+        bars = [Bar(d(16), 10, 10), Bar(d(17), 90, 90), Bar(d(18), 1, 1)]
+        with self.assertRaisesRegex(ValueError, "exit fee"):
+            backtest(bars, {d(16): True, d(17): False}, initial_cash=100, fee_per_order=10)
+
     def test_invalid_prices_rejected(self):
         with self.assertRaises(ValueError):
             backtest([Bar(d(16), 0, 10)], {})
