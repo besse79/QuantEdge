@@ -59,6 +59,8 @@ def backtest(
     if not isfinite(fee_per_order) or fee_per_order < 0:
         raise ValueError("fee_per_order must be finite and nonnegative")
     days = [bar.day for bar in bars]
+    if any(type(day) is not date for day in days):
+        raise ValueError("bars must use calendar dates")
     if days != sorted(set(days)):
         raise ValueError("bars must have strictly increasing unique dates")
     for bar in bars:
