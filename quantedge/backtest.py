@@ -81,6 +81,8 @@ def backtest(
                     quantity = amount
                     trades.append(Trade(bar.day, "BUY", amount, bar.open, fee_per_order))
             elif not target and quantity:
+                if cash + quantity * bar.open < fee_per_order:
+                    raise ValueError("insufficient cash to cover exit fee")
                 cash += quantity * bar.open - fee_per_order
                 trades.append(Trade(bar.day, "SELL", quantity, bar.open, fee_per_order))
                 quantity = 0
