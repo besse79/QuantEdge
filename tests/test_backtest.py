@@ -46,6 +46,11 @@ class PointInTimeBacktestTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             backtest(self.bars, {}, fee_per_order=-1)
 
+    def test_intraday_bar_rejected(self):
+        from datetime import datetime
+        with self.assertRaisesRegex(ValueError, "calendar dates"):
+            backtest([Bar(datetime(2026, 11, 16, 12), 10, 11)], {})
+
 
 if __name__ == "__main__":
     unittest.main()
