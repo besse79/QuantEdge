@@ -29,4 +29,11 @@ def performance(result, initial_cash):
 
 def run_momentum(connection, **kwargs):
     result = run_mkd_backtest(connection, signal=momentum_signal, **kwargs)
-    return result, performance(result, kwargs.get("initial_cash", 500.0))
+    cash = kwargs.get("initial_cash", 500.0)
+    metrics = performance(result, cash)
+    # Benchmark uses identical qualified session prices and execution rules.
+    benchmark = run_mkd_backtest(connection, signal=lambda *_: True, **kwargs)
+    baseline = performance(benchmark, cash)
+    metrics["benchmark"] = baseline
+    metrics["excess_return"] = metrics["total_return"] - baseline["total_return"]
+    return result, metrics
