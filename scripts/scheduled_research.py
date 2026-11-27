@@ -1,5 +1,6 @@
 """Generate daily research report for each market's last completed session."""
 import json
+import os
 from datetime import datetime, timedelta, timezone
 from quantedge.api import ScanRequest, daily_scan, paper_account
 from quantedge.calendar import exchange_sessions
@@ -19,3 +20,6 @@ def main():
 
 if __name__=="__main__":
     main()
+    if os.environ.get("QE_ENABLE_PAPER")=="1":
+        from scripts.scheduled_paper import main as paper_main
+        paper_main()
