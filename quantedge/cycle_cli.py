@@ -19,6 +19,8 @@ def main():
     if not args.execute_paper or os.environ.get("QE_ENABLE_PAPER")!="1":
         raise SystemExit("PAPER execution disabled")
     manifest=json.loads(Path(args.manifest).read_text())
+    if manifest.get("membership_verified") is not True:
+        raise ValueError("membership manifest not independently approved")
     day=date.fromisoformat(manifest["as_of"])
     now=datetime.now(timezone.utc)
     if not day<args.execution_day<=now.date():
