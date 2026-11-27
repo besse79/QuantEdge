@@ -60,3 +60,36 @@ def calculate_cash(cash, held, side, quantity, price, fee):
     if result<0:
         raise ValueError("insufficient cash")
     return result
+
+def record_simulated_trade(connection, *, event_id, instrument_id, side, quantity,
+                           price, fee, authorized=False):
+    """Atomic caller-owned transaction, for explicitly authorized PAPER tests."""
+    if authorized is not True:
+        raise ValueError("PAPER execution not authorized")
+    event_id, instrument_id = UUID(str(event_id)), UUID(str(instrument_id))
+    price, fee = Decimal(str(price)), Decimal(str(fee))
+    if type(quantity) is not int or quantity<=0 or side not in ("BUY","SELL"):
+        raise ValueError("invalid trade")
+    if any(not v.is_finite() or v != v.quantize(Decimal("0.00000001")) for v in (price,fee)):
+        raise ValueError("invalid monetary precision")
+    with connection.transaction():
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT current_database()")
+            if cursor.fetchone()[0] != "quantedge_paper":
+                raise ValueError("isolated PAPER database required")
+            cursor.execute("SELECT cash FROM qe_paper_account WHERE id=1 FOR UPDATE")
+            row=cursor.fetchone()
+            if row is None:
+                raise ValueError("PAPER account not initialized")
+            cursor.execute("SELECT instrument_id,side,quantity,price,fee FROM qe_paper_trade WHERE event_id=%s",(event_id,))
+            existing=cursor.fetchone()
+            if existing is not None:
+                if tuple(existing)!=(instrument_id,side,quantity,price,fee):
+                    raise ValueError("conflicting event id")
+                return "duplicate"
+            cursor.execute("SELECT COALESCE(SUM(CASE WHEN side='BUY' THEN quantity ELSE -quantity END),0) FROM qe_paper_trade WHERE instrument_id=%s",(instrument_id,))
+            held=int(cursor.fetchone()[0])
+            balance=calculate_cash(row[0],held,side,quantity,price,fee)
+            cursor.execute("INSERT INTO qe_paper_trade(event_id,instrument_id,side,quantity,price,fee) VALUES(%s,%s,%s,%s,%s,%s)",(event_id,instrument_id,side,quantity,price,fee))
+            cursor.execute("UPDATE qe_paper_account SET cash=%s WHERE id=1",(balance,))
+            return "recorded"
