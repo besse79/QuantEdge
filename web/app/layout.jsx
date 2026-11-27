@@ -1,2 +1,4 @@
 export const metadata = {title:"QuantEdge Research"};
-export default function Layout(<nav style={{display:"flex",gap:24,borderBottom:"1px solid #ddd",paddingBottom:16}}><a href="/scanner">01 · Sélection</a><a href="/paper">02 · Portefeuille</a><a href="/">03 · Backtesting</a></nav>{children}) {return <html lang="fr"><body style={{fontFamily:"system-ui",maxWidth:1000,margin:"40px auto",padding:20}}>{children}</body></html>}
+export default function Layout({children}) {
+ return <html lang="fr"><body style={{fontFamily:"system-ui",maxWidth:1000,margin:"40px auto",padding:20}}><nav style={{display:"flex",gap:24,borderBottom:"1px solid #ddd",paddingBottom:16}}><a href="/scanner">01 · Sélection</a><a href="/paper">02 · Portefeuille</a><a href="/">03 · Backtesting</a></nav>{children}</body></html>
+}
