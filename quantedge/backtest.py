@@ -71,10 +71,15 @@ def backtest(
     cash, quantity = float(initial_cash), 0
     trades: list[Trade] = []
     snapshots: list[Snapshot] = []
-    for index, bar in enumerate(bars):
-        # The previous session's signal is the latest actionable information.
-        if index and bars[index - 1].day in signals:
-            target = signals[bars[index - 1].day]
+    pending = iter(sorted(signals.items()))
+    next_signal = next(pending, None)
+    for bar in bars:
+        # Consume only signals published before this opening, including gaps.
+        target = None
+        while next_signal is not None and next_signal[0] < bar.day:
+            target = next_signal[1]
+            next_signal = next(pending, None)
+        if target is not None:
             if target and quantity == 0:
                 amount = max(0, int((cash - fee_per_order) // bar.open))
                 if amount:
