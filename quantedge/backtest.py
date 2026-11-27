@@ -81,7 +81,10 @@ def backtest(
             next_signal = next(pending, None)
         if target is not None:
             if target and quantity == 0:
-                amount = max(0, int((cash - fee_per_order) // bar.open))
+                raw_amount = (cash - fee_per_order) // bar.open
+                if not isfinite(raw_amount):
+                    raise ValueError("nonfinite position quantity")
+                amount = max(0, int(raw_amount))
                 if amount:
                     cost = amount * bar.open + fee_per_order
                     cash -= cost
@@ -93,5 +96,8 @@ def backtest(
                 cash += quantity * bar.open - fee_per_order
                 trades.append(Trade(bar.day, "SELL", quantity, bar.open, fee_per_order))
                 quantity = 0
-        snapshots.append(Snapshot(bar.day, cash, quantity, cash + quantity * bar.close))
+        equity = cash + quantity * bar.close
+        if not isfinite(cash) or not isfinite(equity):
+            raise ValueError("nonfinite portfolio valuation")
+        snapshots.append(Snapshot(bar.day, cash, quantity, equity))
     return BacktestResult(tuple(trades), tuple(snapshots))
