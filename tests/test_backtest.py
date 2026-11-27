@@ -16,6 +16,16 @@ class PointInTimeBacktestTests(unittest.TestCase):
         self.assertEqual([(t.day, t.price, t.quantity) for t in result.trades], [(d(17), 20, 5)])
         self.assertEqual(result.snapshots[0].quantity, 0)
 
+    def test_signal_in_missing_bar_gap_executes_at_next_open(self):
+        bars = [Bar(d(16), 10, 11), Bar(d(19), 20, 21)]
+        result = backtest(bars, {d(17): True}, initial_cash=100)
+        self.assertEqual([(t.day, t.quantity) for t in result.trades], [(d(19), 5)])
+
+    def test_latest_gap_signal_wins_without_same_day_lookahead(self):
+        bars = [Bar(d(16), 10, 11), Bar(d(19), 20, 21), Bar(d(20), 30, 31)]
+        result = backtest(bars, {d(16): True, d(18): False, d(19): True}, initial_cash=100)
+        self.assertEqual([(t.day, t.quantity) for t in result.trades], [(d(20), 3)])
+
     def test_future_signal_never_executes(self):
         self.assertFalse(backtest(self.bars, {d(19): True}).trades)
 
