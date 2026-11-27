@@ -28,3 +28,19 @@ jobs:
         run: |
           python3 -m compileall -q quantedge scripts
           for f in scripts/*.sh; do bash -n "$f"; done
+      - name: Build and test isolated checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv .venv
+          .venv/bin/python -m pip install -r requirements.txt
+          .venv/bin/python -m unittest discover -s tests -v
+          (cd web && npm install --no-audit --no-fund && npm run build)
+      - name: Check MKD read-only data coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          PGOPTIONS='-c default_transaction_read_only=on -c statement_timeout=15000' psql -X -v ON_ERROR_STOP=1 -h /var/run/postgresql -p 5433 -d market_data_hub <<'SQL'
+          SELECT currency, count(*) FROM public.instrument_identifiers WHERE currency IN ('EUR','USD') GROUP BY currency;
+          SELECT quality_status, count(*) FROM public.eod_bars WHERE currency IN ('EUR','USD') GROUP BY quality_status;
+          SQL
