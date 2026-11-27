@@ -12,16 +12,20 @@ def verify_membership(connection, manifest, *, day, provider):
                 raise ValueError("incomplete membership")
             seen=set()
             for member in members:
+                if member["currency"] not in ("EUR","USD"):
+                    continue
                 key=(member["symbol"],member["mic"])
                 if key in seen:
                     raise ValueError("duplicate membership")
                 seen.add(key)
                 c.execute("""SELECT instrument_id FROM public.instrument_identifiers
                 WHERE provider=%s AND symbol=%s AND mic=%s
-                AND valid_from<=%s AND (valid_to IS NULL OR valid_to>%s)""",
-                (provider,*key,day,day))
+                AND currency=%s AND valid_from<=%s AND (valid_to IS NULL OR valid_to>%s)""",
+                (provider,*key,member['currency'],day,day))
                 rows=c.fetchall()
                 if len(rows)!=1:
                     raise ValueError("missing or ambiguous identifier: "+str(key))
                 expected.add(str(UUID(str(rows[0][0]))))
+    if not expected:
+        raise ValueError('empty EUR/USD universe')
     return expected
