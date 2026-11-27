@@ -54,9 +54,9 @@ def backtest(
     Missing signal means retain the current exposure. Fractional shares are not
     supported. Buy quantity is limited by cash including the transaction fee.
     """
-    if not isfinite(initial_cash) or initial_cash <= 0:
+    if isinstance(initial_cash, bool) or not isfinite(initial_cash) or initial_cash <= 0:
         raise ValueError("initial_cash must be finite and positive")
-    if not isfinite(fee_per_order) or fee_per_order < 0:
+    if isinstance(fee_per_order, bool) or not isfinite(fee_per_order) or fee_per_order < 0:
         raise ValueError("fee_per_order must be finite and nonnegative")
     days = [bar.day for bar in bars]
     if any(type(day) is not date for day in days):
