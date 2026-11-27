@@ -15,7 +15,7 @@ export default function Page(){
  const data=Object.fromEntries(new FormData(e.currentTarget));Object.assign(data,{instrument_id:instrument.instrument_id,provider:instrument.provider,currency:instrument.currency,cash:Number(data.cash),fee:Number(data.fee)});
  try{const r=await fetch("/api/research",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});const body=await r.json();if(!r.ok)throw Error(typeof body.detail==="string"?body.detail:"Requête refusée");setResult(body);}catch(e){setError(e.message);}finally{setBusy(false);}}
  const values=result?.result.snapshots.map(s=>s.equity)||[];let peak=result?.initial_cash||0;const dd=values.map(v=>{peak=Math.max(peak,v);return peak?100*(1-v/peak):0});
- return <main><h1>QuantEdge — Recherche</h1><p>Simulation uniquement. Aucun ordre réel.</p><form onSubmit={submit} style={{display:"grid",gap:12,maxWidth:650}}>
+ return <main><a href="/scanner">Sélection quantitative</a><h1>QuantEdge — Recherche</h1><p>Simulation uniquement. Aucun ordre réel.</p><form onSubmit={submit} style={{display:"grid",gap:12,maxWidth:650}}>
  <label>Rechercher une action<input value={query} onChange={e=>{setQuery(e.target.value);setSelected("")}} /></label>
  <label>Instrument<select required value={selected} onChange={e=>setSelected(e.target.value)}><option value="">{loading?"Chargement…":"Sélectionner"}</option>{filtered.map(({x,i})=><option key={i} value={i}>{x.symbol} — {x.name} ({x.mic}, {x.currency}, {x.provider})</option>)}</select></label>
  <label>Calendrier<input name="calendar" key={selected} defaultValue={instrument?.mic||"XPAR"} required/></label>
