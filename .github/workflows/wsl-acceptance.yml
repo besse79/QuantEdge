@@ -1,0 +1,30 @@
+name: QuantEdge WSL acceptance
+on:
+  push:
+    branches: [feature/v1-point-in-time-backtest]
+    paths: ['.github/workflows/wsl-acceptance.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  wsl-preflight:
+    runs-on: [self-hosted, Linux]
+    timeout-minutes: 10
+    steps:
+      - name: Verify WSL and prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -qi microsoft /proc/sys/kernel/osrelease
+          echo "WSL confirmed"
+          for cmd in python3 node npm psql pg_isready; do
+            command -v "$cmd" >/dev/null
+            echo "PASS $cmd"
+          done
+          pg_isready -h /var/run/postgresql -p 5433
+          echo "MKD PostgreSQL socket reachable"
+      - uses: actions/checkout@v4
+      - name: Validate source syntax without modifying installed application
+        run: |
+          python3 -m compileall -q quantedge scripts
+          for f in scripts/*.sh; do bash -n "$f"; done
