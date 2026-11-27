@@ -10,10 +10,12 @@ from quantedge.calendar import exchange_sessions
 def main():
     if os.environ.get("QE_ENABLE_PAPER")!="1":
         raise SystemExit("PAPER disabled")
-    root=Path(os.environ["QE_APPROVED_MANIFEST_DIR"])
+    root=Path(os.environ.get("MKD_APPROVED_MANIFEST_DIR") or os.environ["QE_APPROVED_MANIFEST_DIR"])
     now=datetime.now(timezone.utc)
     for path in sorted(root.glob("*.json"),reverse=True):
         manifest=json.loads(path.read_text())
+        if manifest.get("membership_verified") is not True:
+            continue
         day=date.fromisoformat(manifest["as_of"])
         if day>=now.date() or (now.date()-day).days>14:
             continue
