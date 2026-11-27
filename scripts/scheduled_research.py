@@ -15,7 +15,7 @@ def main():
             raise RuntimeError("no completed session: "+mic)
         day=completed[-1].day
         reports[mic]=daily_scan(ScanRequest(provider="yahoo",mic=mic,start=day-timedelta(days=550),end=day))
-    print(json.dumps({"generated_at":now.isoformat(),"markets":reports,"plan":build_plan(reports,paper_account()),"execution_authorized":False},default=str,allow_nan=False))
+    print(json.dumps({"generated_at":now.isoformat(),"markets":reports,"plan":build_plan(reports,paper_account(),session=now.date().isoformat()),"execution_authorized":False},default=str,allow_nan=False))
 
 if __name__=="__main__":
     main()
