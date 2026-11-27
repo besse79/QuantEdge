@@ -44,6 +44,16 @@ class PointInTimeBacktestTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "exit fee"):
             backtest(bars, {d(16): True, d(17): False}, initial_cash=100, fee_per_order=10)
 
+    def test_nonfinite_portfolio_valuation_rejected(self):
+        bars = [Bar(d(16), 1, 1), Bar(d(17), 1, 1e308)]
+        with self.assertRaisesRegex(ValueError, "nonfinite portfolio valuation"):
+            backtest(bars, {d(16): True})
+
+    def test_nonfinite_position_quantity_rejected(self):
+        bars = [Bar(d(16), 1, 1), Bar(d(17), 1e-320, 1)]
+        with self.assertRaisesRegex(ValueError, "nonfinite position quantity"):
+            backtest(bars, {d(16): True})
+
     def test_invalid_prices_rejected(self):
         with self.assertRaises(ValueError):
             backtest([Bar(d(16), 0, 10)], {})
