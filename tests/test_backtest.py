@@ -42,6 +42,12 @@ class PointInTimeBacktestTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             backtest([self.bars[1], self.bars[0]], {})
 
+    def test_boolean_cash_and_fee_rejected(self):
+        with self.assertRaisesRegex(ValueError, "initial_cash"):
+            backtest(self.bars, {}, initial_cash=True)
+        with self.assertRaisesRegex(ValueError, "fee_per_order"):
+            backtest(self.bars, {}, fee_per_order=False)
+
     def test_invalid_fee_rejected(self):
         with self.assertRaises(ValueError):
             backtest(self.bars, {}, fee_per_order=-1)
