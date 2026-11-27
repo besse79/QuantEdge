@@ -23,3 +23,13 @@ class ResearchTests(unittest.TestCase):
 
     def test_flat_equity(self):
         self.assertIsNone(performance(BacktestResult((),()),500)["sharpe_zero_rf_252"])
+
+    def test_benchmark(self):
+        from unittest.mock import patch
+        from quantedge.research import run_momentum
+        a = BacktestResult((), (Snapshot(date(2026,1,1), 110, 0, 110),))
+        b = BacktestResult((), (Snapshot(date(2026,1,1), 105, 0, 105),))
+        with patch("quantedge.research.run_mkd_backtest", side_effect=[a,b]) as run:
+            _, report = run_momentum(None, initial_cash=100)
+        self.assertAlmostEqual(report["excess_return"], .05)
+        self.assertTrue(run.call_args.kwargs["signal"]((), None))
