@@ -1,5 +1,5 @@
 """Read-only MKD point-in-time history adapter (DB-API PostgreSQL connection)."""
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from math import isfinite
 from uuid import UUID
 from .backtest import Bar
@@ -28,11 +28,11 @@ def load_history(connection, *, instrument_id, provider, currency, start, end, a
     instrument_id = UUID(str(instrument_id))
     if type(start) is not date or type(end) is not date or start > end:
         raise ValueError("invalid session range")
-    if not isinstance(as_of, datetime) or as_of.utcoffset() is None or end > as_of.date():
+    if not isinstance(as_of, datetime) or as_of.utcoffset() is None or end > as_of.date() or as_of > datetime.now(timezone.utc):
         raise ValueError("invalid point-in-time cutoff")
     if not isinstance(provider, str) or not provider.strip():
         raise ValueError("provider required")
-    if not isinstance(currency, str) or len(currency) != 3 or not currency.isascii() or not currency.isalpha() or currency != currency.upper():
+    if currency not in ("EUR", "USD"):
         raise ValueError("invalid currency")
     with connection.cursor() as cursor:
         cursor.execute(SQL, (str(instrument_id), provider, start, end, as_of, as_of))
