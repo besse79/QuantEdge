@@ -19,7 +19,19 @@ permissions:
 jobs:
   unittest:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: qe_test
+          POSTGRES_PASSWORD: disposable_ci_only
+          POSTGRES_DB: quantedge_paper
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      QE_TEST_PAPER_DSN: postgresql://qe_test:disposable_ci_only@127.0.0.1:5432/quantedge_paper
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
