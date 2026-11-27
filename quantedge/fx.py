@@ -3,10 +3,10 @@ from decimal import Decimal
 from datetime import timedelta
 
 def eur_rate(connection, currency, *, day, as_of, provider, max_age_days=4):
+    if currency not in ("EUR", "USD") or as_of.tzinfo is None or as_of.utcoffset() is None:
+        raise ValueError("unsupported currency or cutoff")
     if currency=="EUR":
         return Decimal(1)
-    if currency!="USD" or as_of.tzinfo is None or as_of.utcoffset() is None:
-        raise ValueError("unsupported currency or cutoff")
     with connection.cursor() as cursor:
         cursor.execute("""
             SELECT effective_date,rate,quality_status,base
