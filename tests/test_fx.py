@@ -18,3 +18,12 @@ class FxTests(unittest.TestCase):
             cursor.fetchone.return_value=row
             with self.assertRaises(ValueError):
                 eur_rate(c,"USD",**args)
+
+    def test_identity_rate_requires_aware_cutoff(self):
+        c=MagicMock()
+        day=date(2026,11,26)
+        for currency in ("EUR","USD"):
+            with self.assertRaises(ValueError):
+                eur_rate(c,currency,day=day,as_of=datetime(2026,11,26),provider="test")
+        self.assertEqual(eur_rate(c,"EUR",day=day,as_of=datetime(2026,11,26,tzinfo=timezone.utc),provider="test"),Decimal(1))
+        c.cursor.assert_not_called()
