@@ -44,3 +44,16 @@ class MKDHistoryTests(unittest.TestCase):
         self.cursor.fetchall.return_value = [self.row, self.row]
         with self.assertRaises(ValueError):
             load_history(self.connection, **self.args)
+
+    def test_non_trading_currencies_rejected_before_query(self):
+        for currency in ("GBP", "CHF", "JPY", "GBX"):
+            with self.assertRaisesRegex(ValueError, "currency"):
+                load_history(self.connection, **{**self.args, "currency": currency})
+        self.cursor.execute.assert_not_called()
+
+    def test_future_cutoff_rejected_before_query(self):
+        from datetime import timedelta
+        future = datetime.now(timezone.utc) + timedelta(days=1)
+        with self.assertRaisesRegex(ValueError, "cutoff"):
+            load_history(self.connection, **{**self.args, "as_of": future})
+        self.cursor.execute.assert_not_called()
