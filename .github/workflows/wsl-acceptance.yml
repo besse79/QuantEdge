@@ -9,7 +9,7 @@ permissions:
 jobs:
   wsl-preflight:
     runs-on: [self-hosted, Linux]
-    timeout-minutes: 10
+    timeout-minutes: 25
     steps:
       - name: Verify WSL and prerequisites
         shell: bash
@@ -40,7 +40,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          curl -fsS --max-time 10 http://127.0.0.1:8100/health/live
           PGOPTIONS='-c default_transaction_read_only=on -c statement_timeout=15000' psql -X -v ON_ERROR_STOP=1 -h /var/run/postgresql -p 5433 -d market_data_hub <<'SQL'
-          SELECT currency, count(*) FROM public.instrument_identifiers WHERE currency IN ('EUR','USD') GROUP BY currency;
+          SELECT currency, count(*) FROM public.instrument_identifiers WHERE provider='yahoo' AND valid_to IS NULL AND currency IN ('EUR','USD') GROUP BY currency;
           SELECT quality_status, count(*) FROM public.eod_bars WHERE currency IN ('EUR','USD') GROUP BY quality_status;
           SQL
