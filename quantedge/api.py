@@ -116,3 +116,19 @@ def paper_account():
             return snapshot(connection)
     except (psycopg.Error, KeyError, ValueError):
         raise HTTPException(503, "PAPER account unavailable") from None
+
+@app.get("/paper/valuation")
+def paper_valuation(provider: str = "yahoo", fx_provider: str = "yahoo"):
+    import psycopg
+    from .valuation import value_portfolio
+    account = paper_account()
+    now = datetime.now(timezone.utc)
+    try:
+        with psycopg.connect(os.environ["MKD_DSN"], connect_timeout=5,
+                             options="-c statement_timeout=15000") as connection:
+            connection.read_only = True
+            connection.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
+            return value_portfolio(connection, account, day=now.date(), as_of=now,
+                                   provider=provider, fx_provider=fx_provider)
+    except (psycopg.Error, KeyError, ValueError):
+        raise HTTPException(503, "Valuation unavailable") from None
