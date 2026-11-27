@@ -1,0 +1,2 @@
+export const metadata = {title:"QuantEdge Research"};
+export default function Layout({children}) {return <html lang="fr"><body style={{fontFamily:"system-ui",maxWidth:1000,margin:"40px auto",padding:20}}>{children}</body></html>}
