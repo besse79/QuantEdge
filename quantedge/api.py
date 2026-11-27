@@ -45,3 +45,24 @@ def research(request: ResearchRequest):
         raise HTTPException(422, "Invalid request or insufficient qualified history") from None
     except psycopg.Error:
         raise HTTPException(503, "MarketDataHub unavailable") from None
+
+@app.get("/instruments")
+def instruments():
+    import psycopg
+    try:
+        with psycopg.connect(os.environ["MKD_DSN"], connect_timeout=5,
+                             options="-c statement_timeout=15000") as connection:
+            connection.read_only = True
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT DISTINCT i.id, i.name, x.symbol, x.provider, x.currency, x.mic
+                    FROM public.instruments i
+                    JOIN public.instrument_identifiers x ON x.instrument_id=i.id
+                    WHERE i.status='active' AND x.valid_from <= CURRENT_TIMESTAMP
+                      AND (x.valid_to IS NULL OR x.valid_to > CURRENT_TIMESTAMP)
+                    ORDER BY x.symbol, x.provider, x.mic, i.id, x.currency, i.name
+                """)
+                return [dict(zip(("instrument_id","name","symbol","provider","currency","mic"), row))
+                        for row in cursor.fetchall()]
+    except (psycopg.Error, KeyError):
+        raise HTTPException(503, "MarketDataHub unavailable") from None
