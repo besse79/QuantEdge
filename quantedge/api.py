@@ -103,3 +103,16 @@ def daily_scan(request: ScanRequest):
         raise HTTPException(422, "Invalid scan or unavailable session") from None
     except psycopg.Error:
         raise HTTPException(503, "MarketDataHub unavailable") from None
+
+@app.get("/paper")
+def paper_account():
+    import psycopg
+    from .paper_ledger import snapshot
+    try:
+        with psycopg.connect(os.environ["QE_PAPER_DSN"], connect_timeout=5,
+                             options="-c statement_timeout=15000") as connection:
+            connection.read_only = True
+            connection.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
+            return snapshot(connection)
+    except (psycopg.Error, KeyError, ValueError):
+        raise HTTPException(503, "PAPER account unavailable") from None
