@@ -13,7 +13,7 @@ app = FastAPI(title="QuantEdge Research")
 class ResearchRequest(BaseModel):
     instrument_id: UUID
     provider: str = Field(min_length=1, max_length=40)
-    currency: str = Field(pattern=r"^[A-Z]{3}$")
+    currency: str = Field(pattern=r"^(EUR|USD)$")
     calendar: str = Field(pattern=r"^[A-Z0-9]{4}$")
     history_start: date
     start: date
@@ -58,7 +58,7 @@ def instruments():
                     SELECT DISTINCT i.id, i.name, x.symbol, x.provider, x.currency, x.mic
                     FROM public.instruments i
                     JOIN public.instrument_identifiers x ON x.instrument_id=i.id
-                    WHERE i.status='active' AND x.valid_from <= CURRENT_TIMESTAMP
+                    WHERE i.status='active' AND x.currency IN ('EUR','USD') AND x.valid_from <= CURRENT_TIMESTAMP
                       AND (x.valid_to IS NULL OR x.valid_to > CURRENT_TIMESTAMP)
                     ORDER BY x.symbol, x.provider, x.mic, i.id, x.currency, i.name
                 """)
@@ -92,7 +92,7 @@ def daily_scan(request: ScanRequest):
                     SELECT DISTINCT i.id, x.provider, x.currency
                     FROM public.instruments i JOIN public.instrument_identifiers x
                     ON x.instrument_id=i.id
-                    WHERE x.provider=%s AND x.mic=%s
+                    WHERE x.provider=%s AND x.mic=%s AND x.currency IN ('EUR','USD')
                       AND x.valid_from <= %s AND (x.valid_to IS NULL OR x.valid_to > %s)
                     ORDER BY i.id, x.provider, x.currency
                 """, (request.provider, request.mic, session.cutoff, session.cutoff))
