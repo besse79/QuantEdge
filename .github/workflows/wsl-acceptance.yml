@@ -45,3 +45,19 @@ jobs:
           SELECT currency, count(*) FROM public.instrument_identifiers WHERE provider='yahoo' AND valid_to IS NULL AND currency IN ('EUR','USD') GROUP BY currency;
           SELECT quality_status, count(*) FROM public.eod_bars WHERE currency IN ('EUR','USD') GROUP BY quality_status;
           SQL
+      - name: Verify actual MKD observation client
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PGOPTIONS='-c default_transaction_read_only=on'
+          export SAMPLE=$(psql -XAt -F '|' -h /var/run/postgresql -p 5433 -d market_data_hub -v ON_ERROR_STOP=1 -c "SELECT i.instrument_id,i.symbol,i.mic,i.currency,b.session_date FROM instrument_identifiers i JOIN eod_bars b ON b.instrument_id=i.instrument_id AND b.currency=i.currency WHERE i.provider='yahoo' AND i.valid_to IS NULL AND i.currency IN ('EUR','USD') AND b.provider='yahoo' AND b.quality_status='staged_unverified' AND b.session_date<b.first_available_at::date ORDER BY b.session_date DESC LIMIT 1")
+          test -n "$SAMPLE"
+          python3 - <<'PY'
+          import os
+          from datetime import date,datetime,timezone
+          from quantedge.mkd_observations import observed_history
+          iid,symbol,mic,currency,day=os.environ['SAMPLE'].split('|')
+          doc=observed_history(iid,currency=currency,start=date.fromisoformat(day),end=date.fromisoformat(day),as_of=datetime.now(timezone.utc))
+          assert doc['items'] and doc['paper_eligible'] is False
+          print('MKD_CLIENT_PASS',symbol,day)
+          PY
