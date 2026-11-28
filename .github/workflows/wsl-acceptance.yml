@@ -50,7 +50,7 @@ jobs:
         run: |
           set -euo pipefail
           export PGOPTIONS='-c default_transaction_read_only=on'
-          export SAMPLE=$(psql -XAt -F '|' -h /var/run/postgresql -p 5433 -d market_data_hub -v ON_ERROR_STOP=1 -c "SELECT i.instrument_id,i.symbol,i.mic,i.currency,b.session_date FROM instrument_identifiers i JOIN eod_bars b ON b.instrument_id=i.instrument_id AND b.currency=i.currency WHERE i.provider='yahoo' AND i.valid_to IS NULL AND i.currency IN ('EUR','USD') AND b.provider='yahoo' AND b.quality_status='staged_unverified' AND b.session_date<b.first_available_at::date ORDER BY b.session_date DESC LIMIT 1")
+          export SAMPLE=$(psql -XAt -F '|' -h /var/run/postgresql -p 5433 -d market_data_hub -v ON_ERROR_STOP=1 -c "SELECT i.instrument_id,i.symbol,i.mic,i.currency,b.session_date FROM instrument_identifiers i JOIN eod_bars b ON b.instrument_id=i.instrument_id AND b.currency=i.currency WHERE i.provider='yahoo' AND i.valid_to IS NULL AND i.currency IN ('EUR','USD') AND b.provider='yahoo' AND b.quality_status='staged_unverified' AND b.session_date<b.first_available_at::date AND (SELECT count(DISTINCT h.session_date) FROM eod_bars h WHERE h.instrument_id=i.instrument_id AND h.provider='yahoo' AND h.currency=i.currency AND h.session_date BETWEEN b.session_date-400 AND b.session_date AND h.quality_status IN ('legacy_unverified','staged_unverified')) >= 253 ORDER BY b.session_date DESC LIMIT 1")
           test -n "$SAMPLE"
           python3 - <<'PY'
           import os
@@ -67,7 +67,7 @@ jobs:
           from quantedge.scanner import Candidate,scan_observed
           iid,symbol,mic,currency,day=os.environ['SAMPLE'].split('|')
           end=date.fromisoformat(day)
-          result=scan_observed([Candidate(iid,'yahoo',currency)],start=end-timedelta(days=365),end=end,as_of=datetime.now(timezone.utc))
+          result=scan_observed([Candidate(iid,'yahoo',currency)],start=end-timedelta(days=400),end=end,as_of=datetime.now(timezone.utc))
           assert result['source']=='MKD_MIXED_RESEARCH' and result['paper_eligible'] is False
           assert len(result['ranked'])==1, result
           print('MOMENTUM_RESEARCH_RESULT',result)
