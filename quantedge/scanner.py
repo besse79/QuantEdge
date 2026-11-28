@@ -39,14 +39,14 @@ def scan(connection, candidates, *, start, end, as_of):
 
 def scan_observed(candidates, *, start, end, as_of):
     """Current research only; insufficient observed history is explicitly rejected."""
-    from .mkd_observations import observed_history
+    from .mkd_observations import research_history
     from urllib.error import URLError
     ranked, rejected = [], []
     for candidate in dict.fromkeys(candidates):
         try:
             if candidate.provider != "yahoo":
                 raise ValueError("unsupported observation provider")
-            doc = observed_history(candidate.instrument_id,currency=candidate.currency,start=start,end=end,as_of=as_of)
+            doc = research_history(candidate.instrument_id,currency=candidate.currency,start=start,end=end,as_of=as_of)
             rows = doc["items"]
             if not rows or rows[-1]["date"] != end.isoformat():
                 raise ValueError("missing latest session")
@@ -57,4 +57,4 @@ def scan_observed(candidates, *, start, end, as_of):
         except (ValueError, URLError, KeyError) as exc:
             rejected.append(dict(instrument_id=candidate.instrument_id,reason=str(exc)))
     ranked.sort(key=lambda r:(-r["momentum"],r["instrument_id"]))
-    return dict(ranked=ranked,rejected=rejected,source="MKD_OBSERVED",paper_eligible=False)
+    return dict(ranked=ranked,rejected=rejected,source="MKD_MIXED_RESEARCH",paper_eligible=False)
