@@ -36,3 +36,25 @@ def scan(connection, candidates, *, start, end, as_of):
     ranked.sort(key=lambda r:(-r["momentum"],r["instrument_id"],r["provider"],r["currency"]))
     return {"ranked":ranked,"rejected":rejected,"unique_candidates":len(seen),
             "paper_eligible":False}
+
+def scan_observed(candidates, *, start, end, as_of):
+    """Current research only; insufficient observed history is explicitly rejected."""
+    from .mkd_observations import observed_history
+    from urllib.error import URLError
+    ranked, rejected = [], []
+    for candidate in dict.fromkeys(candidates):
+        try:
+            if candidate.provider != "yahoo":
+                raise ValueError("unsupported observation provider")
+            doc = observed_history(candidate.instrument_id,currency=candidate.currency,start=start,end=end,as_of=as_of)
+            rows = doc["items"]
+            if not rows or rows[-1]["date"] != end.isoformat():
+                raise ValueError("missing latest session")
+            score = momentum_score([Observation(r["date"],float(r["close"])) for r in rows],end.isoformat())["momentum_12_1"]
+            if not isfinite(score):
+                raise ValueError("nonfinite momentum")
+            ranked.append(dict(instrument_id=candidate.instrument_id,currency=candidate.currency,provider="yahoo",momentum=score,close=float(rows[-1]["close"]),research_candidate=score>0,paper_eligible=False))
+        except (ValueError, URLError, KeyError) as exc:
+            rejected.append(dict(instrument_id=candidate.instrument_id,reason=str(exc)))
+    ranked.sort(key=lambda r:(-r["momentum"],r["instrument_id"]))
+    return dict(ranked=ranked,rejected=rejected,source="MKD_OBSERVED",paper_eligible=False)
