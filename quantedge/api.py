@@ -120,7 +120,7 @@ def paper_account():
         raise HTTPException(503, "PAPER account unavailable") from None
 
 @app.get("/paper/valuation")
-def paper_valuation(provider: str = "yahoo", fx_provider: str = "yahoo"):
+def paper_valuation(provider: str = "yahoo", fx_provider: str = "ecb"):
     import psycopg
     from .valuation import value_portfolio
     account = paper_account()
