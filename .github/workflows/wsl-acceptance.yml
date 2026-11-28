@@ -117,6 +117,25 @@ jobs:
             fi
           done
           curl -fsS --max-time 5 http://127.0.0.1:8100/health/live
+      - name: Verify actual PAPER valuation API default
+        shell: bash
+        run: |
+          set -euo pipefail
+          export MKD_DSN='dbname=market_data_hub host=/var/run/postgresql port=5433'
+          export PGOPTIONS='-c default_transaction_read_only=on'
+          .venv/bin/python - <<'PY'
+          from unittest.mock import patch
+          from fastapi.testclient import TestClient
+          from quantedge.api import app
+          from decimal import Decimal
+          with patch('quantedge.api.paper_account', return_value={'cash':'500','positions':[]}):
+              response=TestClient(app).get('/paper/valuation')
+          assert response.status_code==200, response.text
+          result=response.json()
+          assert result['complete'] and Decimal(result['equity_eur'])==500
+          assert result['execution_authorized'] is False
+          print('QE_PAPER_API_READONLY_PASS',result)
+          PY
       - name: Install isolated local preview
         if: github.ref == 'refs/heads/feature/v1-point-in-time-backtest'
         run: bash scripts/install_preview.sh
