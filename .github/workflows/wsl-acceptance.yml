@@ -1,0 +1,147 @@
+name: QuantEdge WSL acceptance
+on:
+  push:
+    branches: [feature/v1-point-in-time-backtest]
+    paths: ['.github/workflows/wsl-acceptance.yml']
+  pull_request:
+    branches: [main]
+    paths: ['quantedge/**', 'tests/**', '.github/workflows/wsl-acceptance.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  wsl-preflight:
+    if: github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feature/v1-point-in-time-backtest' && github.event.pull_request.number == 10)
+    runs-on: [self-hosted, Linux]
+    timeout-minutes: 25
+    steps:
+      - name: Verify WSL and prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -qi microsoft /proc/sys/kernel/osrelease
+          echo "WSL confirmed"
+          for cmd in python3 node npm psql pg_isready; do
+            command -v "$cmd" >/dev/null
+            echo "PASS $cmd"
+          done
+          pg_isready -h /var/run/postgresql -p 5433
+          echo "MKD PostgreSQL socket reachable"
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate source syntax without modifying installed application
+        run: |
+          python3 -m compileall -q quantedge scripts
+          for f in scripts/*.sh; do bash -n "$f"; done
+      - name: Build and test isolated checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv .venv
+          .venv/bin/python -m pip install -r requirements.txt
+          .venv/bin/python -m unittest discover -s tests -v
+          (cd web && npm install --no-audit --no-fund && npm run build)
+      - name: Check MKD read-only data coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS --max-time 10 http://127.0.0.1:8100/health/live
+          PGOPTIONS='-c default_transaction_read_only=on -c statement_timeout=15000' psql -X -v ON_ERROR_STOP=1 -h /var/run/postgresql -p 5433 -d market_data_hub <<'SQL'
+          SELECT currency, count(*) FROM public.instrument_identifiers WHERE provider='yahoo' AND valid_to IS NULL AND currency IN ('EUR','USD') GROUP BY currency;
+          SELECT quality_status, count(*) FROM public.eod_bars WHERE currency IN ('EUR','USD') GROUP BY quality_status;
+          SQL
+      - name: Verify actual MKD observation client
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PGOPTIONS='-c default_transaction_read_only=on'
+          export SAMPLE=$(psql -XAt -F '|' -h /var/run/postgresql -p 5433 -d market_data_hub -v ON_ERROR_STOP=1 -c "SELECT i.instrument_id,i.symbol,i.mic,i.currency,b.session_date FROM instrument_identifiers i JOIN eod_bars b ON b.instrument_id=i.instrument_id AND b.currency=i.currency WHERE i.provider='yahoo' AND i.valid_to IS NULL AND i.currency IN ('EUR','USD') AND b.provider='yahoo' AND b.quality_status='staged_unverified' AND b.session_date<b.first_available_at::date AND (SELECT count(DISTINCT h.session_date) FROM eod_bars h WHERE h.instrument_id=i.instrument_id AND h.provider='yahoo' AND h.currency=i.currency AND h.session_date BETWEEN b.session_date-400 AND b.session_date AND h.quality_status IN ('legacy_unverified','staged_unverified')) >= 253 ORDER BY b.session_date DESC LIMIT 1")
+          test -n "$SAMPLE"
+          python3 - <<'PY'
+          import os
+          from datetime import date,datetime,timezone
+          from quantedge.mkd_observations import observed_history
+          iid,symbol,mic,currency,day=os.environ['SAMPLE'].split('|')
+          doc=observed_history(iid,currency=currency,start=date.fromisoformat(day),end=date.fromisoformat(day),as_of=datetime.now(timezone.utc))
+          assert doc['items'] and doc['paper_eligible'] is False
+          print('MKD_CLIENT_PASS',symbol,day)
+          PY
+          python3 - <<'PY'
+          import os
+          from datetime import date,datetime,timezone,timedelta
+          from quantedge.scanner import Candidate,scan_observed
+          iid,symbol,mic,currency,day=os.environ['SAMPLE'].split('|')
+          end=date.fromisoformat(day)
+          result=scan_observed([Candidate(iid,'yahoo',currency)],start=end-timedelta(days=400),end=end,as_of=datetime.now(timezone.utc))
+          assert result['source']=='MKD_MIXED_RESEARCH' and result['paper_eligible'] is False
+          assert len(result['ranked'])==1, result
+          print('MOMENTUM_RESEARCH_RESULT',result)
+          PY
+      - name: Verify actual ECB conversion and PAPER valuation safety
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PGOPTIONS='-c default_transaction_read_only=on'
+          .venv/bin/python - <<'PY'
+          import psycopg
+          from datetime import datetime,timezone,timedelta
+          from decimal import Decimal
+          from quantedge.fx import eur_rate,convert_to_eur
+          from quantedge.valuation import value_portfolio
+          now=datetime.now(timezone.utc)
+          with psycopg.connect("dbname=market_data_hub host=/var/run/postgresql port=5433") as db:
+              day,raw,available=db.execute("SELECT effective_date,rate,first_available_at FROM fx_eod WHERE base='EUR' AND quote='USD' AND provider='ecb' AND quality_status='valid' ORDER BY effective_date DESC,revision DESC LIMIT 1").fetchone()
+              rate=eur_rate(db,"USD",day=day,as_of=now,provider="ecb")
+              assert abs(convert_to_eur(raw*500,rate)-Decimal(500))<Decimal("0.000001")
+              try:
+                  eur_rate(db,"USD",day=day,as_of=available-timedelta(microseconds=1),provider="ecb")
+              except ValueError:
+                  pass
+              else:
+                  raise AssertionError("FX available before first observation")
+              account={"cash":"500","positions":[]}
+              result=value_portfolio(db,account,day=day,as_of=now,provider="yahoo",fx_provider="ecb")
+              assert result["complete"] and Decimal(result["equity_eur"])==500 and not result["execution_authorized"]
+              print("QE_FX_VALUATION_PASS",day,rate,result)
+          PY
+      - name: Verify local preview deployment prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
+          systemctl --user show-environment >/dev/null
+          for port in 3012 8012 3013 8013 8100; do
+            printf 'PORT %s ' "$port"
+            if ss -H -ltn "sport = :$port" | grep -q .; then echo LISTENING; else echo FREE; fi
+          done
+          for port in 5432 5433 5434; do
+            if pg_isready -q -h /var/run/postgresql -p "$port"; then
+              echo "POSTGRES $port"
+              PGOPTIONS='-c default_transaction_read_only=on' psql -XAt -h /var/run/postgresql -p "$port" -d postgres -c "SELECT datname FROM pg_database WHERE datname IN ('quantedge_paper','market_data_hub')" || echo "DATABASE_ACCESS_UNAVAILABLE $port"
+            fi
+          done
+          curl -fsS --max-time 5 http://127.0.0.1:8100/health/live
+      - name: Verify actual PAPER valuation API default
+        shell: bash
+        run: |
+          set -euo pipefail
+          export MKD_DSN='dbname=market_data_hub host=/var/run/postgresql port=5433'
+          export PGOPTIONS='-c default_transaction_read_only=on'
+          .venv/bin/python - <<'PY'
+          from unittest.mock import patch
+          from fastapi.testclient import TestClient
+          from quantedge.api import app
+          from decimal import Decimal
+          with patch('quantedge.api.paper_account', return_value={'cash':'500','positions':[]}):
+              response=TestClient(app).get('/paper/valuation')
+          assert response.status_code==200, response.text
+          result=response.json()
+          assert result['complete'] and Decimal(result['equity_eur'])==500
+          assert result['execution_authorized'] is False
+          print('QE_PAPER_API_READONLY_PASS',result)
+          PY
+      - name: Install isolated local preview
+        if: github.ref == 'refs/heads/feature/v1-point-in-time-backtest'
+        run: bash scripts/install_preview.sh

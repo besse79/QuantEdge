@@ -1,0 +1,58 @@
+name: QuantEdge unit tests
+on:
+  push:
+    paths:
+      - 'quantedge/**'
+      - 'tests/**'
+      - 'web/**'
+      - 'scripts/**'
+      - 'requirements.txt'
+      - '.github/workflows/quantedge-tests.yml'
+  pull_request:
+    paths:
+      - 'quantedge/**'
+      - 'tests/**'
+      - 'web/**'
+      - 'scripts/**'
+      - 'requirements.txt'
+      - '.github/workflows/quantedge-tests.yml'
+permissions:
+  contents: read
+jobs:
+  unittest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: qe_test
+          POSTGRES_PASSWORD: disposable_ci_only
+          POSTGRES_DB: quantedge_paper
+        ports:
+          - 5432:5432
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      QE_TEST_PAPER_DSN: postgresql://qe_test:disposable_ci_only@127.0.0.1:5432/quantedge_paper
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+      - run: python -m unittest discover -s tests -v
+      - run: python -m compileall -q quantedge scripts
+      - run: for f in scripts/*.sh; do bash -n "$f"; done
+  web-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npm run build
