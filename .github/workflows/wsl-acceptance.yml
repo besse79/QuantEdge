@@ -72,3 +72,30 @@ jobs:
           assert len(result['ranked'])==1, result
           print('MOMENTUM_RESEARCH_RESULT',result)
           PY
+      - name: Verify actual ECB conversion and PAPER valuation safety
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PGOPTIONS='-c default_transaction_read_only=on'
+          .venv/bin/python - <<'PY'
+          import psycopg
+          from datetime import datetime,timezone,timedelta
+          from decimal import Decimal
+          from quantedge.fx import eur_rate,convert_to_eur
+          from quantedge.valuation import value_portfolio
+          now=datetime.now(timezone.utc)
+          with psycopg.connect("dbname=market_data_hub host=/var/run/postgresql port=5433") as db:
+              day,raw,available=db.execute("SELECT effective_date,rate,first_available_at FROM fx_eod WHERE base='EUR' AND quote='USD' AND provider='ecb' AND quality_status='valid' ORDER BY effective_date DESC,revision DESC LIMIT 1").fetchone()
+              rate=eur_rate(db,"USD",day=day,as_of=now,provider="ecb")
+              assert abs(convert_to_eur(raw*500,rate)-Decimal(500))<Decimal("0.000001")
+              try:
+                  eur_rate(db,"USD",day=day,as_of=available-timedelta(microseconds=1),provider="ecb")
+              except ValueError:
+                  pass
+              else:
+                  raise AssertionError("FX available before first observation")
+              account={"cash":"500","positions":[]}
+              result=value_portfolio(db,account,day=day,as_of=now,provider="yahoo",fx_provider="ecb")
+              assert result["complete"] and Decimal(result["equity_eur"])==500 and not result["execution_authorized"]
+              print("QE_FX_VALUATION_PASS",day,rate,result)
+          PY
