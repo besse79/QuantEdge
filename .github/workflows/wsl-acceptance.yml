@@ -117,3 +117,6 @@ jobs:
             fi
           done
           curl -fsS --max-time 5 http://127.0.0.1:8100/health/live
+      - name: Install isolated local preview
+        if: github.ref == 'refs/heads/feature/v1-point-in-time-backtest'
+        run: bash scripts/install_preview.sh
