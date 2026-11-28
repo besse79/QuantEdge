@@ -1,8 +1,8 @@
 name: QuantEdge WSL acceptance
 on:
   push:
-    branches: [feature/v1-point-in-time-backtest]
-    paths: ['.github/workflows/wsl-acceptance.yml']
+    branches: [feature/v1-point-in-time-backtest, main]
+    paths: ['.github/workflows/wsl-acceptance.yml', 'scripts/install_preview.sh']
   pull_request:
     branches: [main]
     paths: ['quantedge/**', 'tests/**', '.github/workflows/wsl-acceptance.yml']
@@ -143,5 +143,10 @@ jobs:
           print('QE_PAPER_API_READONLY_PASS',result)
           PY
       - name: Install isolated local preview
-        if: github.ref == 'refs/heads/feature/v1-point-in-time-backtest'
-        run: bash scripts/install_preview.sh
+        if: github.ref == 'refs/heads/main'
+        run: |
+          bash scripts/install_preview.sh
+          for unit in quantedge-preview-db.service quantedge-preview-api.service quantedge-preview-web.service; do
+            systemctl --user is-active "$unit"
+            systemctl --user is-enabled "$unit"
+          done
