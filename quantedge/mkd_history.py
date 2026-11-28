@@ -49,7 +49,12 @@ def load_history(connection, *, instrument_id, provider, currency, start, end, a
             raise ValueError("unqualified MKD history")
         if bars and day <= bars[-1].day:
             raise ValueError("duplicate or unordered MKD session")
-        prices = (float(opening), float(closing))
+        if isinstance(opening, bool) or isinstance(closing, bool):
+            raise ValueError("invalid MKD prices")
+        try:
+            prices = (float(opening), float(closing))
+        except (TypeError, ValueError, OverflowError) as exc:
+            raise ValueError("invalid MKD prices") from exc
         if not all(isfinite(p) and p > 0 for p in prices):
             raise ValueError("invalid MKD prices")
         bars.append(Bar(day, *prices))
