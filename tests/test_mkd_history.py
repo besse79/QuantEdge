@@ -57,3 +57,14 @@ class MKDHistoryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "cutoff"):
             load_history(self.connection, **{**self.args, "as_of": future})
         self.cursor.execute.assert_not_called()
+
+    def test_malformed_prices_rejected(self):
+        for bad in (None, True, False, 'invalid', float('nan'), float('inf'), 0, -1):
+            for index in (1, 2):
+                with self.subTest(price=bad, index=index):
+                    row = list(self.row)
+                    row[index] = bad
+                    self.cursor.fetchall.return_value = [tuple(row)]
+                    with self.assertRaisesRegex(ValueError, 'invalid MKD prices'):
+                        load_history(self.connection, **self.args)
+        self.connection.commit.assert_not_called()
