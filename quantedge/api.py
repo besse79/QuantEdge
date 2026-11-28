@@ -74,8 +74,8 @@ class ScanRequest(BaseModel):
     end: date
 
 @app.post("/scan")
-def daily_scan(request: ScanRequest):
-    from .scanner import Candidate, scan
+def daily_scan(request: ScanRequest, observed: bool = False):
+    from .scanner import Candidate, scan, scan_observed
     import psycopg
     if not request.start <= request.end <= date.today() or (request.end-request.start).days > 1096:
         raise HTTPException(422, "Invalid scan range")
@@ -97,6 +97,8 @@ def daily_scan(request: ScanRequest):
                     ORDER BY i.id, x.provider, x.currency
                 """, (request.provider, request.mic, session.cutoff, session.cutoff))
                 candidates = [Candidate(str(i), p, c) for i,p,c in cursor.fetchall()]
+            if observed:
+                return scan_observed(candidates,start=request.start,end=request.end,as_of=datetime.now(timezone.utc))
             return scan(connection, candidates, start=request.start, end=request.end,
                         as_of=session.cutoff)
     except (ValueError, KeyError):
