@@ -68,7 +68,7 @@ jobs:
           iid,symbol,mic,currency,day=os.environ['SAMPLE'].split('|')
           end=date.fromisoformat(day)
           result=scan_observed([Candidate(iid,'yahoo',currency)],start=end-timedelta(days=365),end=end,as_of=datetime.now(timezone.utc))
-          assert result['source']=='MKD_OBSERVED' and result['paper_eligible'] is False
-          assert len(result['ranked'])+len(result['rejected'])==1
+          assert result['source']=='MKD_MIXED_RESEARCH' and result['paper_eligible'] is False
+          assert len(result['ranked'])==1, result
           print('MOMENTUM_RESEARCH_RESULT',result)
           PY
