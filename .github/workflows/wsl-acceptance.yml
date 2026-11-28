@@ -61,3 +61,14 @@ jobs:
           assert doc['items'] and doc['paper_eligible'] is False
           print('MKD_CLIENT_PASS',symbol,day)
           PY
+          python3 - <<'PY'
+          import os
+          from datetime import date,datetime,timezone,timedelta
+          from quantedge.scanner import Candidate,scan_observed
+          iid,symbol,mic,currency,day=os.environ['SAMPLE'].split('|')
+          end=date.fromisoformat(day)
+          result=scan_observed([Candidate(iid,'yahoo',currency)],start=end-timedelta(days=365),end=end,as_of=datetime.now(timezone.utc))
+          assert result['source']=='MKD_OBSERVED' and result['paper_eligible'] is False
+          assert len(result['ranked'])+len(result['rejected'])==1
+          print('MOMENTUM_RESEARCH_RESULT',result)
+          PY
