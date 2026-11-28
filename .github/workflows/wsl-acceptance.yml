@@ -99,3 +99,21 @@ jobs:
               assert result["complete"] and Decimal(result["equity_eur"])==500 and not result["execution_authorized"]
               print("QE_FX_VALUATION_PASS",day,rate,result)
           PY
+      - name: Verify local preview deployment prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
+          systemctl --user show-environment >/dev/null
+          for port in 3012 8012 3013 8013 8100; do
+            printf 'PORT %s ' "$port"
+            if ss -H -ltn "sport = :$port" | grep -q .; then echo LISTENING; else echo FREE; fi
+          done
+          for port in 5432 5433 5434; do
+            if pg_isready -q -h /var/run/postgresql -p "$port"; then
+              echo "POSTGRES $port"
+              PGOPTIONS='-c default_transaction_read_only=on' psql -XAt -h /var/run/postgresql -p "$port" -d postgres -c "SELECT datname FROM pg_database WHERE datname IN ('quantedge_paper','market_data_hub')" || echo "DATABASE_ACCESS_UNAVAILABLE $port"
+            fi
+          done
+          curl -fsS --max-time 5 http://127.0.0.1:8100/health/live
