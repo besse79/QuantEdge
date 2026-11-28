@@ -3,11 +3,15 @@ on:
   push:
     branches: [feature/v1-point-in-time-backtest]
     paths: ['.github/workflows/wsl-acceptance.yml']
+  pull_request:
+    branches: [main]
+    paths: ['quantedge/**', 'tests/**', '.github/workflows/wsl-acceptance.yml']
   workflow_dispatch:
 permissions:
   contents: read
 jobs:
   wsl-preflight:
+    if: github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feature/v1-point-in-time-backtest' && github.event.pull_request.number == 10)
     runs-on: [self-hosted, Linux]
     timeout-minutes: 25
     steps:
@@ -24,6 +28,8 @@ jobs:
           pg_isready -h /var/run/postgresql -p 5433
           echo "MKD PostgreSQL socket reachable"
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Validate source syntax without modifying installed application
         run: |
           python3 -m compileall -q quantedge scripts
